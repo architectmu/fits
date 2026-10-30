@@ -721,10 +721,19 @@ async function deleteBoard(b){st.boards=st.boards.filter(x=>x!==b);await DB.del(
 const elSrc=e=>{if(e.kind==='image')return st.media[e.mediaId]?.src;if(e.kind!=='item')return null;const it=itemById(e.itemId);return it&&(itemPhotos(it)[e.pi||0]||it.img)};
 async function renderThumb(b){const tw=520,s=tw/b.W,c=mkCanvas(tw,b.H*s),ctx=c.getContext('2d');ctx.fillStyle=b.bg;ctx.fillRect(0,0,c.width,c.height);
  try{await document.fonts.ready}catch(e){}
- for(const e of [...b.elements].sort((a,z)=>a.z-z.z)){ctx.save();ctx.translate((e.x+e.w/2)*s,(e.y+e.h/2)*s);ctx.rotate((e.r||0)*Math.PI/180);if(e.flip)ctx.scale(-1,1);
-  const w=e.w*s,h=e.h*s;
-  if(e.kind==='item'||e.kind==='image'){const src=elSrc(e);if(src){try{const img=await loadImg(src),ir=img.naturalWidth/img.naturalHeight;let dw=w,dh=w/ir;if(dh>h){dh=h;dw=h*ir}ctx.drawImage(img,-dw/2,-dh/2,dw,dh)}catch(err){}}}
+ for(const e of [...b.elements].sort((a,z)=>a.z-z.z)){ctx.save();ctx.translate((e.x+e.w/2)*s,(e.y+e.h/2)*s);ctx.rotate((e.r||0)*Math.PI/180);ctx.scale(e.flip?-1:1,e.flipV?-1:1);
+  const w=e.w*s,h=e.h*s;if(e.op!=null)ctx.globalAlpha=e.op;
+  if(e.shadow){ctx.shadowColor='rgba(0,0,0,.3)';ctx.shadowBlur=14*s;ctx.shadowOffsetY=10*s}
+  if(e.rad||hasCrop(e)){ctx.beginPath();ctx.roundRect?ctx.roundRect(-w/2,-h/2,w,h,(e.rad||0)*s):ctx.rect(-w/2,-h/2,w,h);ctx.clip()}
+  if(e.kind==='item'||e.kind==='image'||e.kind==='deco'){const src=e.kind==='deco'?decoSrc(e.deco):elSrc(e);if(src){try{const img=await loadImg(src),ir=img.naturalWidth/img.naturalHeight;
+   // a cropped piece is drawn at full size and the clip above keeps only its window
+   const c=hasCrop(e)?e.crop:{l:0,t:0,r:0,b:0},FW=w/(1-c.l-c.r),FH=h/(1-c.t-c.b),ox=-w/2-c.l*FW+FW/2,oy=-h/2-c.t*FH+FH/2;
+   let dw=FW,dh=FW/ir;if(e.kind==='deco'){dw=FW;dh=FH}else if(dh>FH){dh=FH;dw=FH*ir}ctx.drawImage(img,ox-dw/2,oy-dh/2,dw,dh)}catch(err){}}}
   else if(e.kind==='swatch'){ctx.fillStyle=e.color;ctx.beginPath();ctx.roundRect?ctx.roundRect(-w/2,-h/2,w,h,6*s):ctx.rect(-w/2,-h/2,w,h);ctx.fill()}
+  else if(e.kind==='note'){ctx.shadowColor='rgba(0,0,0,.18)';ctx.shadowBlur=16*s;ctx.shadowOffsetY=8*s;ctx.fillStyle=e.color;ctx.fillRect(-w/2,-h/2,w,h);ctx.shadowColor='transparent';
+   const fs=e.size*s;ctx.font=`400 ${fs}px ${FONTS[e.font||'hand']}`;ctx.fillStyle='#2b2b2b';ctx.textBaseline='top';ctx.textAlign='left';const pad=w*.09,lines=[];
+   for(const para of String(e.text).split('\n')){let line='';for(const word of para.split(' ')){const tst=line?line+' '+word:word;if(ctx.measureText(tst).width>w-2*pad&&line){lines.push(line);line=word}else line=tst}lines.push(line)}
+   lines.forEach((l,i)=>ctx.fillText(l,-w/2+pad,-h/2+h*.08+i*fs*1.25))}
   else if(e.kind==='text'){const fs=e.size*s;ctx.font=`${e.bold?700:400} ${fs}px ${FONTS[e.font]}`;ctx.fillStyle=e.color;ctx.textBaseline='top';
    ctx.textAlign=e.align==='center'?'center':e.align==='right'?'right':'left';const ax=e.align==='center'?0:e.align==='right'?w/2:-w/2,lines=[];
    for(const para of String(e.text).split('\n')){let line='';for(const word of para.split(' ')){const tst=line?line+' '+word:word;if(ctx.measureText(tst).width>w&&line){lines.push(line);line=word}else line=tst}lines.push(line)}
@@ -775,27 +784,31 @@ function fit(){const b=board(),wrap=$('#wrap');if(!b||!wrap)return;const W=wrap.
  const box=$('#sbox');box.style.width=b.W*s+'px';box.style.height=b.H*s+'px';box.style.left=(W-b.W*s)/2+'px';box.style.top=(H-b.H*s)/2+'px';
  const stg=$('#stage');stg.style.transform=`scale(${s})`;stg.style.setProperty('--inv',1/s)}
 function toStage(e){const r=$('#stage').getBoundingClientRect(),s=st.ed.scale;return{x:(e.clientX-r.left)/s,y:(e.clientY-r.top)/s}}
-function elStyle(e){return `left:${e.x}px;top:${e.y}px;width:${e.w}px;height:${e.h}px;transform:rotate(${e.r||0}deg);z-index:${e.z}`}
+function elStyle(e){return `left:${e.x}px;top:${e.y}px;width:${e.w}px;height:${e.h}px;transform:rotate(${e.r||0}deg);z-index:${e.z}`+
+ (e.op!=null?`;opacity:${e.op}`:'')+(e.shadow?';filter:drop-shadow(0 calc(10px * var(--inv)) calc(14px * var(--inv)) rgba(0,0,0,.3))':'')}
 function elInner(e){if(e.kind==='text')return `<div class="txt" dir="auto" style="font-size:${e.size}px;color:${e.color};font-family:${FONTS[e.font]};font-weight:${e.bold?700:400};text-align:${e.align}">${esc(e.text)}</div>`;
- if(e.kind==='swatch')return `<div class="sw" style="background:${e.color}"></div>`;const src=elSrc(e);return src?`<img src="${src}" draggable="false" alt="">`:`<div class="missing">?</div>`}
+ if(e.kind==='swatch')return `<div class="sw" style="background:${e.color}"></div>`;
+ if(e.kind==='note')return noteInner(e);if(e.kind==='deco')return `<img src="${decoSrc(e.deco)}" draggable="false" alt="">`;
+ const src=elSrc(e);return !src?`<div class="missing">?</div>`:hasCrop(e)?croppedImg(e,src):`<img src="${src}" draggable="false" alt="">`}
+const elInStyle=e=>`transform:scale(${e.flip?-1:1},${e.flipV?-1:1})`+(e.rad||hasCrop(e)?`;overflow:hidden;border-radius:${e.rad||0}px`:'');
 function renderStage(){const b=board(),stg=$('#stage');stg.style.width=b.W+'px';stg.style.height=b.H+'px';stg.style.background=b.bg;
- stg.innerHTML=[...b.elements].sort((a,z)=>a.z-z.z).map(e=>`<div class="el k-${e.kind} ${st.ed.sel===e.id?'sel':''}" data-id="${e.id}" style="${elStyle(e)}"><div class="el-in" style="transform:scaleX(${e.flip?-1:1})">${elInner(e)}</div><i class="hd nw" data-h="nw"></i><i class="hd ne" data-h="ne"></i><i class="hd sw" data-h="sw"></i><i class="hd se" data-h="se"></i><i class="hd rot" data-h="rot"></i></div>`).join('')}
+ stg.innerHTML=[...b.elements].sort((a,z)=>a.z-z.z).map(e=>`<div class="el k-${e.kind} ${st.ed.sel===e.id?'sel':''} ${e.lock?'locked':''}" data-id="${e.id}" style="${elStyle(e)}"><div class="el-in" style="${elInStyle(e)}">${elInner(e)}</div><i class="hd nw" data-h="nw"></i><i class="hd ne" data-h="ne"></i><i class="hd sw" data-h="sw"></i><i class="hd se" data-h="se"></i><i class="hd rot" data-h="rot"></i></div>`).join('')}
 function select(id){st.ed.sel=id;$$('#stage .el').forEach(n=>n.classList.toggle('sel',n.dataset.id===id));renderSelbar()}
 const selEl=()=>st.ed&&board().elements.find(e=>e.id===st.ed.sel);
 function onStageDown(ev){if(ev.button!==0)return;const node=ev.target.closest('.el');
  if(!node){select(null);return}if(ev.target.closest('[contenteditable="true"]'))return;
- const e=board().elements.find(x=>x.id===node.dataset.id);if(!e)return;select(e.id);
- const mode=ev.target.dataset.h||'move',p0=toStage(ev),s0={...e},c={x:e.x+e.w/2,y:e.y+e.h/2},lock=e.kind!=='swatch';let moved=false;
+ const e=board().elements.find(x=>x.id===node.dataset.id);if(!e)return;select(e.id);if(e.lock)return;
+ const mode=ev.target.dataset.h||'move',p0=toStage(ev),s0={...e},c={x:e.x+e.w/2,y:e.y+e.h/2},lock=e.kind!=='swatch'&&e.kind!=='note';let moved=false;
  const mv=m=>{const p=toStage(m);moved=true;
-  if(mode==='move'){e.x=s0.x+p.x-p0.x;e.y=s0.y+p.y-p0.y}
+  if(mode==='move'){e.x=s0.x+p.x-p0.x;e.y=s0.y+p.y-p0.y;snapMove(e,board(),m.altKey)} // hold Alt to move freely without snapping
   else if(mode==='rot'){let a=s0.r+(Math.atan2(p.y-c.y,p.x-c.x)-Math.atan2(p0.y-c.y,p0.x-c.x))*180/Math.PI;if(m.shiftKey)a=Math.round(a/15)*15;e.r=((a%360)+360)%360}
   else{if(lock){const k=Math.max(.05,Math.hypot(p.x-c.x,p.y-c.y)/Math.max(1,Math.hypot(p0.x-c.x,p0.y-c.y)));e.w=s0.w*k;e.h=s0.h*k;if(e.kind==='text')e.size=s0.size*k}
    else{const rad=-s0.r*Math.PI/180,dx=p.x-c.x,dy=p.y-c.y;e.w=Math.max(20,2*Math.abs(dx*Math.cos(rad)-dy*Math.sin(rad)));e.h=Math.max(20,2*Math.abs(dx*Math.sin(rad)+dy*Math.cos(rad)))}
    e.x=c.x-e.w/2;e.y=c.y-e.h/2}
   node.style.cssText=elStyle(e);if(e.kind==='text')$('.txt',node).style.fontSize=e.size+'px'};
- const up=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);if(moved){commit();if(e.kind==='text')renderSelbar()}};
+ const up=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);clearGuides();if(moved){commit();if(e.kind==='text'||e.kind==='note')renderSelbar()}};
  addEventListener('pointermove',mv);addEventListener('pointerup',up)}
-function onStageDbl(ev){const node=ev.target.closest('.el.k-text');if(!node)return;const e=board().elements.find(x=>x.id===node.dataset.id),tx=$('.txt',node);
+function onStageDbl(ev){const node=ev.target.closest('.el.k-text,.el.k-note');if(!node)return;const e=board().elements.find(x=>x.id===node.dataset.id),tx=$('.txt',node);
  tx.contentEditable='true';tx.focus();document.execCommand('selectAll');
  tx.onblur=()=>{tx.contentEditable='false';const v=tx.innerText.replace(/\n$/,'');if(v!==e.text){e.text=v;commit()}}}
 function renderSelbar(){const bar=$('#selbar');if(!bar)return;const e=selEl();
@@ -805,18 +818,26 @@ function renderSelbar(){const bar=$('#selbar');if(!bar)return;const e=selEl();
  if(e.kind!=='text')h+=`<button class="icon-btn ${e.flip?'on':''}" data-a="flip" title="${t('flip')}">${ic('flip')}</button>`;
  const nPh=e.kind==='item'?itemPhotos(itemById(e.itemId)||{img:''}).length:1;
  if(nPh>1)h+=`<button class="btn ghost sm" data-a="photo" title="${t('swapPhoto')}">${ic('image',15)} ${(e.pi||0)+1}/${nPh}</button>`;
- if(e.kind==='text')h+=`<span class="dv"></span><select data-p="font">${['sans','serif','hand'].map(f=>`<option value="${f}" ${e.font===f?'selected':''}>${t('font'+f[0].toUpperCase()+f.slice(1))}</option>`).join('')}</select>
+ if(e.kind==='text')h+=`<span class="dv"></span>${fontSelect(e.font)}
   <input type="number" data-p="size" min="8" max="400" value="${Math.round(e.size)}" title="${t('size')}">
   <button class="icon-btn ${e.bold?'on':''}" data-a="bold" title="${t('bold')}">${ic('bold')}</button>
   <select data-p="align" title="${t('align')}">${['left','center','right'].map(a=>`<option value="${a}" ${e.align===a?'selected':''}>${{left:'⇤',center:'↔',right:'⇥'}[a]}</option>`).join('')}</select>`;
  if(e.kind==='text'||e.kind==='swatch')h+=`<label class="colorpick" title="${t('color')}" style="background:${e.color}"><input type="color" data-p="color" value="${e.color}"></label>`;
+ h+=boardToolsHTML(e);
  h+=`<span class="dv"></span><button class="icon-btn" data-a="del" title="${t('delete')} (Del)" style="color:var(--danger)">${ic('trash')}</button>`;
  bar.innerHTML=h;
- bar.onclick=ev=>{const a=ev.target.closest('[data-a]')?.dataset.a;if(a)selAction(a)};
- bar.oninput=ev=>{const p=ev.target.dataset.p;if(!p)return;const v=ev.target.value;e[p]=p==='size'?Math.max(8,+v||e.size):v;if(p==='color')ev.target.parentNode.style.background=v;
+ bar.onclick=ev=>{const cr=ev.target.closest('[data-crop]')?.dataset.crop,nc=ev.target.closest('[data-note]')?.dataset.note;
+  if(cr){applyCrop(e,CROP_PRESETS[cr]);renderStage();renderSelbar();commit();return}
+  if(nc){e.color=nc;renderStage();renderSelbar();commit();return}
+  const a=ev.target.closest('[data-a]')?.dataset.a;if(a)selAction(a)};
+ bar.oninput=ev=>{const bt=boardToolsInput(ev.target,e);
+  if(bt){const n=$(`#stage .el[data-id="${e.id}"]`);if(!n)return;if(bt==='style'||bt==='all')n.style.cssText=elStyle(e);
+   if(bt==='inner'||bt==='all'){const inn=$('.el-in',n);inn.style.cssText=elInStyle(e);inn.innerHTML=elInner(e)}return}
+  const p=ev.target.dataset.p;if(!p)return;const v=ev.target.value;e[p]=p==='size'?Math.max(8,+v||e.size):v;if(p==='color')ev.target.parentNode.style.background=v;
   const node=$(`#stage .el[data-id="${e.id}"] .el-in`);if(node)node.innerHTML=elInner(e)};
- bar.onchange=ev=>{if(ev.target.dataset.p)commit()}}
+ bar.onchange=ev=>{if(ev.target.dataset.p||ev.target.dataset.bt||ev.target.dataset.cs)commit()}}
 function selAction(a){const b=board(),e=selEl();if(!e)return;const zs=b.elements.map(x=>x.z);
+ const bt=boardToolsAction(a,e,b);if(bt){if(bt==='bar')renderSelbar();else{renderStage();renderSelbar();commit()}return}
  if(a==='front')e.z=Math.max(...zs)+1;else if(a==='back')e.z=Math.min(...zs)-1;else if(a==='flip')e.flip=!e.flip;else if(a==='bold')e.bold=!e.bold;
  else if(a==='photo'){const n=itemPhotos(itemById(e.itemId)).length;e.pi=((e.pi||0)+1)%n}
  else if(a==='dup'){const n={...e,id:uid(),x:e.x+30,y:e.y+30,z:Math.max(...zs)+1};b.elements.push(n);st.ed.sel=n.id}
@@ -1114,6 +1135,7 @@ async function boot(){
 <script src="measure.js"></script>
 <script src="sizecharts.js"></script>
 <script src="backup-all.js"></script>
+<script src="board-tools.js"></script>
 <script src="tie-ref.js"></script>
 <script src="gemini.js"></script>
 <script src="mobile.js"></script>
