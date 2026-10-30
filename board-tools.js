@@ -129,8 +129,8 @@ document.head.insertAdjacentHTML('beforeend',`<style>
 Object.assign(S.en,{btCrop:'Crop',btFlipV:'Flip vertically',btRot90:'Turn 90°',btCenterX:'Centre left–right',btCenterY:'Centre top–bottom',btShadow:'Shadow',btLock:'Lock in place',btUnlock:'Unlock',
  btOpacity:'Opacity',btRadius:'Round corners',btLeftHalf:'Left half',btRightHalf:'Right half',btTopHalf:'Top half',btBottomHalf:'Bottom half',btReset:'Reset',
  btSide_l:'Left',btSide_r:'Right',btSide_t:'Top',btSide_b:'Bottom',addNote:'Note',addDeco:'Pins',notePh:'Double-click to write',
- deco_pinRed:'Red pin',deco_pinBlue:'Blue pin',deco_pinGold:'Gold pin',deco_tape:'Tape',deco_tapePink:'Pink tape',deco_clip:'Paper clip'});
+ pickPhoto:'Which photo do you want to use?',photo:'Photo',deco_pinRed:'Red pin',deco_pinBlue:'Blue pin',deco_pinGold:'Gold pin',deco_tape:'Tape',deco_tapePink:'Pink tape',deco_clip:'Paper clip'});
 Object.assign(S.ar,{btCrop:'قص',btFlipV:'قلب رأسي',btRot90:'لف 90°',btCenterX:'في النص بالعرض',btCenterY:'في النص بالطول',btShadow:'ظل',btLock:'تثبيت مكانها',btUnlock:'فك التثبيت',
  btOpacity:'الشفافية',btRadius:'تدوير الحواف',btLeftHalf:'النص الشمال',btRightHalf:'النص اليمين',btTopHalf:'النص اللي فوق',btBottomHalf:'النص اللي تحت',btReset:'رجّعها',
  btSide_l:'شمال',btSide_r:'يمين',btSide_t:'فوق',btSide_b:'تحت',addNote:'ورقة لاصقة',addDeco:'دبابيس',notePh:'دوس مرتين واكتب',
- deco_pinRed:'دبوس أحمر',deco_pinBlue:'دبوس أزرق',deco_pinGold:'دبوس دهبي',deco_tape:'شريط لاصق',deco_tapePink:'شريط لاصق بمبي',deco_clip:'مشبك ورق'});
+ pickPhoto:'عايز تحط أنهي صورة؟',photo:'صورة',deco_pinRed:'دبوس أحمر',deco_pinBlue:'دبوس أزرق',deco_pinGold:'دبوس دهبي',deco_tape:'شريط لاصق',deco_tapePink:'شريط لاصق بمبي',deco_clip:'مشبك ورق'});

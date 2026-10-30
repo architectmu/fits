@@ -847,7 +847,15 @@ function addEl(part,at){const b=board(),z=b.elements.length?Math.max(...b.elemen
  at=at||{x:b.W/2+(Math.random()-.5)*120,y:b.H/2+(Math.random()-.5)*120};e.x=at.x-e.w/2;e.y=at.y-e.h/2;
  b.elements.push(e);st.ed.sel=e.id;renderStage();renderSelbar();renderEdItems();commit()}
 async function sizeFor(src,base,maxW){const img=await loadImg(src),r=img.naturalWidth/img.naturalHeight;let h=base,w=h*r;if(w>maxW){w=maxW;h=w/r}return{w,h}}
-async function addItemEl(itemId,at){const it=itemById(itemId);if(!it)return;const b=board();addEl({kind:'item',itemId,...await sizeFor(it.img,b.type==='outfit'?360:320,440)},at)}
+// a piece with several photos asks which one goes on the board
+async function addItemEl(itemId,at){const it=itemById(itemId);if(!it)return;const b=board(),ph=itemPhotos(it);let pi=0;
+ if(ph.length>1){pi=await pickItemPhoto(it,ph);if(pi==null)return}
+ addEl({kind:'item',itemId,...(pi?{pi}:{}),...await sizeFor(ph[pi],b.type==='outfit'?360:320,440)},at)}
+function pickItemPhoto(it,ph){return new Promise(res=>{const md=modal(`<h2>${t('pickPhoto')}</h2><p class="muted sm" style="margin:-8px 0 14px">${esc(it.name||catName(it.category))}</p>
+  <div class="pick-grid">${ph.map((s,i)=>`<button class="pick" data-i="${i}"><img src="${s}" alt="" style="object-fit:contain;padding:6px"><span>${i===0?t('cover'):`${t('photo')} ${i+1}`}</span></button>`).join('')}</div>
+  <div class="md-f"><button class="btn ghost" data-close>${t('cancel')}</button></div>`,{wide:ph.length>3});
+ $('#modal-root').onclose=()=>res(null);
+ $('.pick-grid',md).onclick=e=>{const b=e.target.closest('[data-i]');if(!b)return;$('#modal-root').onclose=null;closeModal();res(+b.dataset.i)}})}
 async function addImageFile(f,at){const src=downscale(await fileToImg(f),1400).toDataURL('image/webp',.88),m={id:uid(),src};st.media[m.id]=m;await DB.put('media',m);addEl({kind:'image',mediaId:m.id,...await sizeFor(src,380,560)},at)}
 function snap(){const b=board();return JSON.stringify({el:b.elements,bg:b.bg})}
 function pushHist(){const h=st.ed,s=snap();if(h.hist[h.hi]===s)return;h.hist=h.hist.slice(0,h.hi+1);h.hist.push(s);if(h.hist.length>100)h.hist.shift();h.hi=h.hist.length-1;updUndo()}
