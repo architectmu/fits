@@ -128,6 +128,7 @@ showPicker=function(){_showPicker();const foot=$('#profiles .pf-foot');if(!foot)
 
 document.head.insertAdjacentHTML('beforeend',`<style>
 #cloudLogin,.cl-busy{position:fixed;inset:0;z-index:200;background:var(--bg);display:grid;place-items:center;padding:16px}
+#cloudLogin[hidden]{display:none}
 .cl-busy{background:rgba(0,0,0,.45)}
 .cl-box{width:min(380px,100%);display:flex;flex-direction:column;gap:10px;text-align:center;background:var(--bg);border-radius:18px;padding:24px}
 .cl-box h1{margin:6px 0 0;font-size:22px}.cl-box .pf-logo{justify-content:center}.cl-box .txt-in{width:100%}
