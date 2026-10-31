@@ -32,7 +32,7 @@ const _renderNav=renderNav;
 renderNav=function(){_renderNav();renderTabs()};
 // closet toolbar on a phone: search on top, the rest in one swipeable row, "Add" as a floating button
 HOOKS.loaded.push(where=>{if(where!=='closet'||!isPhone())return;const tool=$('.ctool');if(!tool||$('.m-row',tool))return;
- const row=document.createElement('div');row.className='m-row';['#mSide','#sort','#bulkBtn','#impBtn'].forEach(s=>{const n=$(s,tool);if(n)row.appendChild(n)});tool.appendChild(row)});
+ const row=document.createElement('div');row.className='m-row';['#webBtn','#mSide','#sort','#bulkBtn','#impBtn'].forEach(s=>{const n=$(s,tool);if(n)row.appendChild(n)});tool.appendChild(row)});
 
 document.head.insertAdjacentHTML('beforeend',`<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Fits">
