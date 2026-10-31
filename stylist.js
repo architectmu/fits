@@ -47,14 +47,19 @@ function buildContext(){const o=st.sty,W=WEATHER.find(w=>w[0]===o.weather)||WEAT
   (ctx.pool[s]=ctx.pool[s]||[]).push({it,s:itemScore(it,ctx)})}
  Object.values(ctx.pool).forEach(a=>a.sort((x,y)=>y.s-x.s));return ctx}
 
+// a belt needs belt loops: no track pants, joggers, shorts or dresses
+const beltable=b=>b&&!['trackpants','shorts'].includes(b.category)&&!/track|jogger|elastic|drawstring|sweat/.test(txtOf(b));
 function pickAccessories(core,ctx){const acc=[],cols=core.map(i=>(i.colors||[])[0]).filter(Boolean),
+ // accessories must suit the outfit's style; a "loud" one (cowboy hat, western belt) needs a clearly matching outfit
  best=slot=>{const c=(ctx.pool[slot]||[]).filter(x=>x.it.id!==ctx.anchor?.id);if(!c.length)return null;
-  return c.map(x=>{const xc=(x.it.colors||[])[0],h=xc&&cols.length?cols.reduce((s,c2)=>s+pairScore(xc,c2).s,0)/cols.length:.6;return {it:x.it,s:x.s*.5+h}}).sort((a,b)=>b.s-a.s).slice(0,3)};
- const W=ctx.weather,bottom=core.find(i=>slotOf(i)==='bottom'),top=core.find(i=>slotOf(i)==='top'),shoes=core.find(i=>slotOf(i)==='shoes');
+  return c.map(x=>{const xc=(x.it.colors||[])[0],h=xc&&cols.length?cols.reduce((s,c2)=>s+pairScore(xc,c2).s,0)/cols.length:.6,v=vibeWith(x.it,core),
+   loud=Object.keys(vibeOf(x.it)).some(k=>['western','sport','resort'].includes(k));return {it:x.it,s:x.s*.5+h+1.4*v,v,loud}})
+   .filter(x=>x.v>=(x.loud?.35:-.05)).sort((a,b)=>b.s-a.s).slice(0,3)};
+ const W=ctx.weather,bottom=core.find(i=>slotOf(i)==='bottom'),top=core.find(i=>slotOf(i)==='top'),shoes=core.find(i=>slotOf(i)==='shoes'),outer=core.find(i=>slotOf(i)==='outer');
  const add=(slot,cond,p=1)=>{if(!cond||Math.random()>p)return;const c=best(slot);if(c?.length)acc.push(wpick(c,4))};
- if(bottom&&bottom.category!=='shorts'&&ctx.target>=2.2){const belts=best('belt');if(belts?.length){const sc=(shoes?.colors||[])[0];
+ if(beltable(bottom)&&ctx.target>=2.2){const belts=best('belt');if(belts?.length){const sc=(shoes?.colors||[])[0];
   const match=belts.find(b=>(b.it.colors||[]).some(c=>c===sc||(['brown','beige'].includes(c)&&['brown','beige'].includes(sc))))||belts[0];acc.push(match.it)}}
- add('tie',ctx.target>=3.8&&top?.category==='shirts');
+ add('tie',ctx.target>=3.4&&top?.category==='shirts'&&(outer?.category==='blazers'||['tailored'].includes(bottom?.category)));
  add('watch',true,.85);
  add('glasses',(W==='hot'||W==='warm')&&ctx.target<3.6,.5);
  add('hat',ctx.style==='vintage'||((W==='cold'||W==='freezing')&&ctx.target<3),.45);
@@ -67,13 +72,19 @@ function pickAccessories(core,ctx){const acc=[],cols=core.map(i=>(i.colors||[])[
 function scoreOutfit(items,ctx){const core=items.filter(i=>CORE.includes(slotOf(i))||slotOf(i)==='dress');
  const h=harmony(items),fs=core.map(formalityOf),mean=fs.reduce((a,b)=>a+b,0)/fs.length,sd=Math.sqrt(fs.reduce((a,b)=>a+(b-mean)**2,0)/fs.length);
  const base=core.reduce((s,i)=>s+itemScore(i,ctx),0)/core.length,coherence=Math.max(0,1-sd/1.5)*Math.max(0,1-Math.abs(mean-ctx.target)/2);
- let total=.42*Math.max(0,Math.min(1,base))+.38*h.score/100+.2*coherence;if(ctx.rejected.has(sig(items)))total-=1;
- return {score:Math.round(Math.max(0,Math.min(1,total))*100),harmony:h,coherence,mean}}
+ const vb=vibeSet(items),vibeFit=Math.max(0,Math.min(1,(vb.mean+.2)/1.1));
+ let total=.32*Math.max(0,Math.min(1,base))+.3*h.score/100+.13*coherence+.25*vibeFit;
+ if(vb.min<-.45)total-=.45;else if(vb.min<-.15)total-=.12; // two pieces that fight (track suit + western belt) sink the outfit
+ if(ctx.rejected.has(sig(items)))total-=1;
+ return {score:Math.round(Math.max(0,Math.min(1,total))*100),harmony:h,coherence,mean,vibe:vb}}
 function explain(items,res,ctx){const r=[],outer=items.find(i=>slotOf(i)==='outer');
  if(ctx.anchor)r.push({k:'rAnchor',v:{n:ctx.anchor.name||catName(ctx.anchor.category)},good:1});
  if(res.coherence>.6)r.push({k:'rFormal',v:{o:t('occ_'+ctx.occ)},good:1});else if(Math.abs(res.mean-ctx.target)>1)r.push({k:'rOffFormal',v:{o:t('occ_'+ctx.occ)},bad:1});
  if(outer&&(ctx.weather==='cold'||ctx.weather==='freezing'))r.push({k:'rLayer',v:{n:outer.name||catName(outer.category)},good:1});
  else if(!outer&&(ctx.weather==='hot'||ctx.weather==='warm'))r.push({k:'rLight',good:1});
+ const vb=res.vibe||vibeSet(items);
+ if(vb.min<-.15&&vb.worst)r.push({k:'rVibeMix',v:{a:vb.worst[0].name||catName(vb.worst[0].category),b:vb.worst[1].name||catName(vb.worst[1].category)},bad:1});
+ else if(vb.lead&&vb.mean>.45)r.push({k:'rVibe',v:{v:t('vb_'+vb.lead)},good:1});
  r.push(...res.harmony.reasons.slice(0,2));
  if(ctx.style){const a=items.reduce((s,i)=>s+styleAffinity(i,ctx.style),0)/items.length;if(a>.45)r.push({k:'rStyle',v:{s:t('st_'+ctx.style)},good:1})}
  const recent=items.filter(i=>ctx.worn[i.id]&&daysSince(ctx.worn[i.id].last)<=6);
@@ -86,24 +97,35 @@ function generate(n=6){const ctx=buildContext(),P=ctx.pool,A=ctx.anchor,aSlot=A&
  if(missing.length&&!(aSlot==='dress'&&!missing.includes('shoes')))return {error:'missing',slots:missing,ctx};
  const needOuter={hot:ctx.target>=3.8?.35:0,warm:.25,mild:.65,cold:1,freezing:1}[ctx.weather];
  const seen=new Map();
- for(let k=0;k<600;k++){const core=[];const pick=slot=>A&&aSlot===slot?A:wpick((P[slot]||[]).slice(0,10));
+ // each round leans toward one style "theme" so the suggestions cover the closet's different looks, not just the biggest group
+ const themes=VIBES.filter(v=>['top','shoes'].every(s=>(P[s]||[]).some(x=>(vibeOf(x.it)[v]||0)>=.5)));
+ for(let k=0;k<700;k++){const core=[],theme=A?null:themes[k%Math.max(1,themes.length)];
+  // each piece is chosen knowing the ones already picked, so the outfit keeps one style (anchor first, then a random lead piece)
+  const pick=slot=>{if(A&&aSlot===slot)return A;const c=(P[slot]||[]).slice(0,16);if(!c.length)return null;
+   const chosen=A?[A,A,...core]:core; // the anchor (even a hat or belt) sets the tone, so it counts twice
+   const th=x=>theme?.9*(vibeOf(x.it)[theme]||0):0;
+   return wpick(c.map(x=>({it:x.it,s:x.s+th(x)+(chosen.length?1.8*vibeWith(x.it,chosen):0)})))};
   const useDress=(P.dress?.length&&Math.random()<.3)||aSlot==='dress';
-  if(useDress){const d=pick('dress');if(!d)continue;core.push(d)}else{const tp=pick('top'),bt=pick('bottom');if(!tp||!bt)continue;core.push(tp,bt)}
-  const sh=pick('shoes');if(!sh)continue;core.push(sh);
+  const order=useDress?['dress','shoes']:(Math.random()<.5?['top','bottom','shoes']:['bottom','top','shoes']);
+  if(aSlot&&order.includes(aSlot)){order.splice(order.indexOf(aSlot),1);order.unshift(aSlot)}
+  let ok=true;for(const s of order){const x=pick(s);if(!x){ok=false;break}core.push(x)}if(!ok)continue;
   if(aSlot==='outer'||(P.outer?.length&&Math.random()<needOuter)){const o=pick('outer');if(o)core.push(o)}
   if(A&&!core.includes(A)&&CORE.includes(aSlot))continue;
   const items=[...core,...pickAccessories(core,ctx)],key=sig(items);
   const res=scoreOutfit(items,ctx);if(!seen.has(key)||seen.get(key).score<res.score)seen.set(key,{items,...res})}
  const ranked=[...seen.values()].sort((a,b)=>b.score-a.score),out=[],shoeUse={};
- for(const r of ranked){if(out.length>=n)break;const tp=r.items.find(i=>slotOf(i)==='top'),bt=r.items.find(i=>slotOf(i)==='bottom'),sh=r.items.find(i=>slotOf(i)==='shoes');
-  if(out.some(o=>o.items.includes(tp)&&o.items.includes(bt)))continue;if(sh&&(shoeUse[sh.id]||0)>=2)continue;shoeUse[sh?.id]=(shoeUse[sh?.id]||0)+1;out.push(r)}
+ const clean=ranked.filter(r=>r.vibe.min>=-.45).length>=n;
+ const leadUse={},maxLead=themes.length>=3?2:3;
+ for(const r of ranked){if(out.length>=n)break;if(clean&&r.vibe.min<-.45)continue;if(!A&&(leadUse[r.vibe.lead]||0)>=maxLead)continue;const tp=r.items.find(i=>slotOf(i)==='top'),bt=r.items.find(i=>slotOf(i)==='bottom'),sh=r.items.find(i=>slotOf(i)==='shoes');
+  if(out.some(o=>o.items.includes(tp)&&o.items.includes(bt)))continue;if(sh&&(shoeUse[sh.id]||0)>=2)continue;if(bt&&(shoeUse['b'+bt.id]||0)>=2)continue;if(bt)shoeUse['b'+bt.id]=(shoeUse['b'+bt.id]||0)+1;shoeUse[sh?.id]=(shoeUse[sh?.id]||0)+1;leadUse[r.vibe.lead]=(leadUse[r.vibe.lead]||0)+1;out.push(r)}
+ for(const r of ranked){if(out.length>=n)break;if(!out.includes(r)&&!(clean&&r.vibe.min<-.45)&&!out.some(o=>sig(o.items)===sig(r.items)))out.push(r)}
  out.forEach(o=>o.reasons=explain(o.items,o,ctx));
  return {results:out,ctx}}
 
 /* swap one piece of a generated outfit for the next good option in that slot */
 function swapPiece(res,itemId){const ctx=buildContext(),old=itemById(itemId),slot=slotOf(old),pool=(ctx.pool[slot]||[]).map(x=>x.it).filter(x=>!res.items.includes(x));
  if(!pool.length)return false;const others=res.items.filter(i=>i!==old),cols=others.map(i=>(i.colors||[])[0]).filter(Boolean);
- const ranked=pool.map(it=>{const c=(it.colors||[])[0];return {it,s:itemScore(it,ctx)+(c&&cols.length?cols.reduce((s,x)=>s+pairScore(c,x).s,0)/cols.length:.5)}}).sort((a,b)=>b.s-a.s);
+ const ranked=pool.map(it=>{const c=(it.colors||[])[0];return {it,s:itemScore(it,ctx)+1.5*vibeWith(it,others)+(c&&cols.length?cols.reduce((s,x)=>s+pairScore(c,x).s,0)/cols.length:.5)}}).sort((a,b)=>b.s-a.s);
  res.cursor=((res.cursor||0)+1)%Math.min(ranked.length,6);const neu=ranked[res.cursor].it;
  res.items=res.items.map(i=>i===old?neu:i);Object.assign(res,scoreOutfit(res.items,ctx));res.reasons=explain(res.items,res,ctx);res.saved=null;return true}
 
@@ -111,7 +133,9 @@ function swapPiece(res,itemId){const ctx=buildContext(),old=itemById(itemId),slo
 function flatLay(items){const by=s=>items.filter(i=>slotOf(i)===s);const main=[...by('outer'),...by('top'),...by('dress'),...by('bottom')],side=[...by('shoes'),...items.filter(i=>!['outer','top','dress','bottom','shoes'].includes(slotOf(i)))];
  const img=i=>`<button class="fl-i" data-swap="${i.id}" title="${esc((i.name||catName(i.category))+' — '+t('clickSwap'))}"><img src="${i.img}" alt=""></button>`;
  return `<div class="fl"><div class="fl-main">${main.map(img).join('')}</div><div class="fl-side">${side.map(img).join('')}</div></div>`}
-function resultCard(r,i){return `<div class="sres" data-i="${i}">${flatLay(r.items)}
+function resultCard(r,i){const worn=r.view==='worn'&&r.wornHTML;
+ return `<div class="sres" data-i="${i}"><div class="view-tg"><button data-view="flat" class="${worn?'':'on'}">${t('flatView')}</button><button data-view="worn" class="${worn?'on':''}">👔 ${t('wornView')}</button></div>
+ ${worn?r.wornHTML:flatLay(r.items)}
  <div class="sr-body"><div class="ep-row"><b class="sr-score">${r.score}%</b><span class="muted sm">${hLabel(r.harmony.label)}</span><span class="sp"></span>${paletteHTML(r.harmony.palette)}</div>
  <div class="hbar"><i style="width:${r.score}%"></i></div>
  <ul class="reasons">${r.reasons.map(x=>`<li class="${x.good?'good':x.bad?'bad':''}">${esc(t(x.k,x.v))}</li>`).join('')}</ul>
@@ -146,8 +170,10 @@ function stylistOutHTML(){const o=st.sty;
  return `<div class="sres-grid">${o.results.map(resultCard).join('')}</div>`}
 function runStylist(){const o=st.sty,g=generate();o.error=g.error?g.slots:null;o.results=g.results||null;renderStylist()}
 async function onResultClick(e){const card=e.target.closest('.sres');if(!card)return;const r=st.sty.results[+card.dataset.i];
+ const vw=e.target.closest('[data-view]')?.dataset.view;
+ if(vw){r.view=vw;if(vw==='worn'&&!r.wornHTML)r.wornHTML=await dressPreviewHTML(r.items);card.outerHTML=resultCard(r,+card.dataset.i);return}
  const sw=e.target.closest('[data-swap]');
- if(sw){if(!swapPiece(r,sw.dataset.swap))toast(t('noSwap'));card.outerHTML=resultCard(r,+card.dataset.i);return}
+ if(sw){if(!swapPiece(r,sw.dataset.swap))toast(t('noSwap'));r.wornHTML=null;r.view='flat';card.outerHTML=resultCard(r,+card.dataset.i);return}
  const act=e.target.closest('[data-act]')?.dataset.act;if(!act)return;
  if(act==='save'){await saveResult(r);toast(t('outfitSaved'));card.outerHTML=resultCard(r,+card.dataset.i)}
  else if(act==='open'){st.view='outfits';openEditor(r.saved)}
@@ -158,7 +184,7 @@ async function onResultClick(e){const card=e.target.closest('.sres');if(!card)re
   st.sty.results.splice(+card.dataset.i,1);$('#styOut').innerHTML=stylistOutHTML();toast(t('rejectedT'))}}
 async function saveResult(r){const o=st.sty,P=PREFS();
  const b=await newOutfitFromItems(r.items,{name:`${t('occ_'+o.occ)}${o.style?' · '+t('st_'+o.style):''} · ${new Intl.DateTimeFormat(calLoc(),{day:'numeric',month:'short'}).format(o.date?new Date(o.date+'T12:00'):new Date())}`,
-  occasion:o.occ,style:o.style,seasons:(WEATHER.find(w=>w[0]===o.weather)||[])[2]||[]});
+  occasion:o.occ,style:o.style,seasons:(WEATHER.find(w=>w[0]===o.weather)||[])[2]||[],worn:r.view==='worn'});
  r.items.forEach(i=>P.item[i.id]=Math.min(.5,(P.item[i.id]||0)+.04));await saveMeta();r.saved=b.id;return b}
 function askDate(){return new Promise(res=>{const tm=new Date();tm.setDate(tm.getDate()+1);
  const md=modal(`<h2>${t('planIt')}</h2><input type="date" class="txt-in" id="pdIn" style="width:100%" value="${ymd(tm)}"><div class="md-f"><button class="btn ghost" data-close>${t('cancel')}</button><button class="btn" id="pdOk">${t('ok')}</button></div>`);

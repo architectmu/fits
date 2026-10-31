@@ -22,7 +22,9 @@ async function layoutOutfit(items){
  return els}
 async function newOutfitFromItems(items,meta={}){
  const[W,H,bg]=SIZES.outfit,n=st.boards.filter(b=>b.type==='outfit').length+1;
- const b={id:uid(),type:'outfit',name:meta.name||`${t('untitledOutfit')} ${n}`,W,H,bg,elements:await layoutOutfit(items),thumb:'',
+ const els=meta.worn?(await dressUp(items.map(it=>({it,src:it.img})),{x:W*.06,y:H*.03,w:W*.88,h:H*.94})).map(o=>({id:uid(),kind:'item',itemId:o.e.it.id,x:o.x,y:o.y,w:o.w,h:o.h,r:0,flip:false,z:o.z}))
+  :await layoutOutfit(items);
+ const b={id:uid(),type:'outfit',name:meta.name||`${t('untitledOutfit')} ${n}`,W,H,bg,elements:els,thumb:'',
   style:meta.style||'',occasion:meta.occasion||'',seasons:meta.seasons||[],notes:meta.notes||'',rating:meta.rating||0,fav:!!meta.fav,archived:false,photos:[],
   created:Date.now(),updated:Date.now()};
  st.boards.push(b);await saveBoard(b);return b}

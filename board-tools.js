@@ -85,7 +85,8 @@ const DECOS={
  tape:{w:150,h:44,svg:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 44"><path d="M6 4l138 2-4 6 5 6-5 7 5 7-4 6 3 4L6 40l4-6-5-6 5-7-5-7 4-6z" fill="rgba(245,236,205,.82)" stroke="rgba(0,0,0,.06)"/></svg>'},
  tapePink:{w:150,h:44,svg:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 44"><path d="M6 4l138 2-4 6 5 6-5 7 5 7-4 6 3 4L6 40l4-6-5-6 5-7-5-7 4-6z" fill="rgba(248,187,208,.8)" stroke="rgba(0,0,0,.06)"/></svg>'},
  clip:{w:40,h:96,svg:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 96"><path d="M28 30V14a8 8 0 0 0-16 0v58a12 12 0 0 0 24 0V22" fill="none" stroke="#8d8d8d" stroke-width="4" stroke-linecap="round"/></svg>'}};
-const decoSrc=k=>'data:image/svg+xml;charset=utf-8,'+encodeURIComponent((DECOS[k]||DECOS.pinRed).svg);
+// a pen sketch is stored as a deco whose "deco" is the drawing itself (an SVG data URL)
+const decoSrc=k=>String(k).startsWith('data:')?k:'data:image/svg+xml;charset=utf-8,'+encodeURIComponent((DECOS[k]||DECOS.pinRed).svg);
 function noteInner(e){return `<div class="note" style="background:${e.color}"><div class="txt" dir="auto" style="font-size:${e.size}px;font-family:${FONTS[e.font||'hand']}">${esc(e.text)}</div></div>`}
 function addNote(){const b=board();addEl({kind:'note',text:t('notePh'),color:NOTE_COLORS[0],size:Math.round(b.W/22),w:b.W/4,h:b.W/4,r:(Math.random()*6-3)})}
 function openDecoPicker(btn){let m=$('#decoMenu');if(m){m.remove();return}
@@ -93,11 +94,53 @@ function openDecoPicker(btn){let m=$('#decoMenu');if(m){m.remove();return}
  btn.after(m);m.onclick=ev=>{const k=ev.target.closest('[data-deco]')?.dataset.deco;if(!k)return;const d=DECOS[k],s=board().W/900;
   addEl({kind:'deco',deco:k,w:d.w*s*1.6,h:d.h*s*1.6,r:k.startsWith('tape')?(Math.random()*16-8):0});m.remove()}}
 HOOKS.loaded.push(where=>{if(where!=='editor')return;const add=$('.ed-add');if(!add||$('#addNote'))return;
- add.insertAdjacentHTML('beforeend',`<button class="btn ghost sm" id="addNote">${ic('note',17)}${t('addNote')}</button><button class="btn ghost sm" id="addDeco">${ic('pin',17)}${t('addDeco')}</button>`);
- $('#addNote').onclick=addNote;$('#addDeco').onclick=e=>openDecoPicker(e.currentTarget)});
+ add.insertAdjacentHTML('beforeend',`<button class="btn ghost sm" id="addNote">${ic('note',17)}${t('addNote')}</button><button class="btn ghost sm" id="addDeco">${ic('pin',17)}${t('addDeco')}</button>
+  <button class="btn ghost sm" id="addPen">${ic('pen',17)}${t('addPen')}</button>`);
+ $('#addNote').onclick=addNote;$('#addDeco').onclick=e=>openDecoPicker(e.currentTarget);$('#addPen').onclick=startDraw});
+
+/* ---- pen: sketch freely on the board; everything drawn in one go becomes one movable piece ---- */
+const PEN_COLORS=['#111111','#ffffff','#e53935','#1e88e5','#c9a227','#ec407a','#43a047'];
+const PEN_TYPES={pen:{w:4,op:1},marker:{w:12,op:1},brush:{w:28,op:1},highlight:{w:30,op:.35}};
+function startDraw(){if(st.ed.draw)return finishDraw();select(null);
+ const D=st.ed.draw={strokes:[],color:st.ed.penColor||'#111111',type:st.ed.penType||'pen'};renderSelbar();mountDrawLayer();$('#addPen')?.classList.add('on')}
+function mountDrawLayer(){const D=st.ed?.draw,stg=$('#stage');if(!D||!stg||$('#drawOv'))return;const b=board();
+ stg.insertAdjacentHTML('beforeend',`<div id="drawOv"><svg viewBox="0 0 ${b.W} ${b.H}" width="100%" height="100%">${D.strokes.map(strokeSVG).join('')}</svg></div>`);
+ const ov=$('#drawOv'),svg=$('svg',ov);
+ ov.onpointerdown=ev=>{ev.stopPropagation();ev.preventDefault();ov.setPointerCapture(ev.pointerId);const p=PEN_TYPES[D.type],s={c:D.color,w:p.w*b.W/1000,op:p.op,pts:[toStage(ev)]};D.strokes.push(s);
+  svg.insertAdjacentHTML('beforeend',strokeSVG(s));const path=svg.lastElementChild;
+  ov.onpointermove=m=>{const q=toStage(m),l=s.pts[s.pts.length-1];if(Math.hypot(q.x-l.x,q.y-l.y)<1.5)return;s.pts.push(q);path.setAttribute('d',strokeD(s.pts))};
+  ov.onpointerup=ov.onpointercancel=()=>{ov.onpointermove=null;if(s.pts.length===1)s.pts.push({x:s.pts[0].x+.1,y:s.pts[0].y});path.setAttribute('d',strokeD(s.pts));renderSelbar()}}}
+// smooth line through the points (midpoint quadratic curves)
+function strokeD(p){if(p.length<3)return `M${p[0].x} ${p[0].y}`+p.slice(1).map(q=>` L${q.x} ${q.y}`).join('');
+ let d=`M${p[0].x} ${p[0].y}`;for(let i=1;i<p.length-1;i++){const mx=(p[i].x+p[i+1].x)/2,my=(p[i].y+p[i+1].y)/2;d+=` Q${p[i].x} ${p[i].y} ${mx} ${my}`}
+ const l=p[p.length-1];return d+` L${l.x} ${l.y}`}
+const strokeSVG=s=>`<path d="${strokeD(s.pts)}" fill="none" stroke="${s.c}" stroke-width="${s.w}" stroke-opacity="${s.op}" stroke-linecap="round" stroke-linejoin="round"/>`;
+function finishDraw(){const D=st.ed?.draw;if(!D)return;st.ed.draw=null;$('#drawOv')?.remove();$('#addPen')?.classList.remove('on');
+ if(D.strokes.length){const xs=[],ys=[];let mw=0;D.strokes.forEach(s=>{mw=Math.max(mw,s.w);s.pts.forEach(p=>{xs.push(p.x);ys.push(p.y)})});
+  const x0=Math.min(...xs)-mw,y0=Math.min(...ys)-mw,w=Math.max(...xs)+mw-x0,h=Math.max(...ys)+mw-y0;
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} ${y0} ${w} ${h}" width="${Math.round(w)}" height="${Math.round(h)}">${D.strokes.map(strokeSVG).join('')}</svg>`;
+  addEl({kind:'deco',deco:'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg),draw:1,w,h},{x:x0+w/2,y:y0+h/2})}
+ else renderSelbar()}
+function drawBarHTML(){const D=st.ed.draw;
+ return `<b class="sm">✏️ ${t('penDrawing')}</b><span class="dv"></span>
+  ${Object.keys(PEN_TYPES).map(k=>`<button class="btn ghost sm ${D.type===k?'on':''}" data-pt="${k}">${t('pen_'+k)}</button>`).join('')}<span class="dv"></span>
+  <span class="bt-notes">${PEN_COLORS.map(c=>`<button data-pc="${c}" class="${c===D.color?'on':''}" style="background:${c}"></button>`).join('')}</span>
+  <label class="colorpick" title="${t('color')}" style="background:${D.color}"><input type="color" data-pcc value="${D.color}"></label><span class="dv"></span>
+  <button class="icon-btn" data-pu ${D.strokes.length?'':'disabled'} title="${t('undo')}">${ic('undo',18,'rtl-flip')}</button>
+  <button class="btn ghost sm" data-px ${D.strokes.length?'':'disabled'}>${t('penClear')}</button><span class="sp" style="flex:1"></span>
+  <button class="btn sm" data-pd>${t('done')}</button>`}
+const _renderSelbar=renderSelbar;
+renderSelbar=function(){const bar=$('#selbar');if(!st.ed?.draw||!bar)return _renderSelbar();const D=st.ed.draw;bar.innerHTML=drawBarHTML();
+ const redraw=()=>{$('#drawOv')?.remove();mountDrawLayer();renderSelbar()};
+ bar.onclick=ev=>{const g=k=>ev.target.closest(`[${k}]`);
+  if(g('data-pt')){D.type=st.ed.penType=g('data-pt').dataset.pt;renderSelbar()}else if(g('data-pc')){D.color=st.ed.penColor=g('data-pc').dataset.pc;renderSelbar()}
+  else if(g('data-pu')){D.strokes.pop();redraw()}else if(g('data-px')){D.strokes=[];redraw()}else if(g('data-pd'))finishDraw()};
+ bar.oninput=ev=>{if(ev.target.dataset.pcc!==undefined){D.color=st.ed.penColor=ev.target.value;ev.target.parentNode.style.background=D.color}};bar.onchange=null};
+const _renderStage=renderStage;
+renderStage=function(){_renderStage();if(st.ed?.draw)mountDrawLayer()};
 
 Object.assign(ICON,{
- note:'<path d="M4 4h16v11l-5 5H4z"/><path d="M15 20v-5h5"/>',pin:'<circle cx="12" cy="8" r="5"/><path d="M12 13v8"/>',
+ note:'<path d="M4 4h16v11l-5 5H4z"/><path d="M15 20v-5h5"/>',pen:'<path d="M4 20l4-1L19 8l-3-3L5 16z"/><path d="M14 7l3 3"/>',pin:'<circle cx="12" cy="8" r="5"/><path d="M12 13v8"/>',
  crop:'<path d="M6 2v14a2 2 0 0 0 2 2h14M2 6h14a2 2 0 0 1 2 2v14"/>',
  rotate:'<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
  alignX:'<path d="M12 3v18M7 8h10v8H7z"/>',alignY:'<path d="M3 12h18M8 7h8v10H8z"/>',
@@ -120,6 +163,8 @@ document.head.insertAdjacentHTML('beforeend',`<style>
 .note{width:100%;height:100%;padding:8% 9%;box-sizing:border-box;box-shadow:0 2px 3px rgba(0,0,0,.12),0 12px 22px rgba(0,0,0,.16);color:#2b2b2b;line-height:1.25;overflow:hidden}
 .note::before{content:'';position:absolute;left:30%;right:30%;top:0;height:7%;background:rgba(0,0,0,.05)}
 .k-deco .el-in img{object-fit:fill}
+#drawOv{position:absolute;inset:0;z-index:99998;cursor:crosshair;touch-action:none}#drawOv svg{display:block}
+#addPen.on{background:var(--ink);color:var(--bg)}
 .ed-add{grid-template-columns:repeat(3,1fr);position:relative}
 #decoMenu{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
 #decoMenu button{width:54px;height:54px;border:1px solid var(--line);border-radius:10px;background:var(--card);display:grid;place-items:center;padding:6px}
@@ -129,8 +174,8 @@ document.head.insertAdjacentHTML('beforeend',`<style>
 Object.assign(S.en,{btCrop:'Crop',btFlipV:'Flip vertically',btRot90:'Turn 90°',btCenterX:'Centre left–right',btCenterY:'Centre top–bottom',btShadow:'Shadow',btLock:'Lock in place',btUnlock:'Unlock',
  btOpacity:'Opacity',btRadius:'Round corners',btLeftHalf:'Left half',btRightHalf:'Right half',btTopHalf:'Top half',btBottomHalf:'Bottom half',btReset:'Reset',
  btSide_l:'Left',btSide_r:'Right',btSide_t:'Top',btSide_b:'Bottom',addNote:'Note',addDeco:'Pins',notePh:'Double-click to write',
- pickPhoto:'Which photo do you want to use?',photo:'Photo',deco_pinRed:'Red pin',deco_pinBlue:'Blue pin',deco_pinGold:'Gold pin',deco_tape:'Tape',deco_tapePink:'Pink tape',deco_clip:'Paper clip'});
+ pickPhoto:'Which photo do you want to use?',photo:'Photo',addPen:'Pen',penDrawing:'Drawing',pen_pen:'Pen',pen_marker:'Marker',pen_brush:'Brush',pen_highlight:'Highlighter',penClear:'Clear',deco_pinRed:'Red pin',deco_pinBlue:'Blue pin',deco_pinGold:'Gold pin',deco_tape:'Tape',deco_tapePink:'Pink tape',deco_clip:'Paper clip'});
 Object.assign(S.ar,{btCrop:'قص',btFlipV:'قلب رأسي',btRot90:'لف 90°',btCenterX:'في النص بالعرض',btCenterY:'في النص بالطول',btShadow:'ظل',btLock:'تثبيت مكانها',btUnlock:'فك التثبيت',
  btOpacity:'الشفافية',btRadius:'تدوير الحواف',btLeftHalf:'النص الشمال',btRightHalf:'النص اليمين',btTopHalf:'النص اللي فوق',btBottomHalf:'النص اللي تحت',btReset:'رجّعها',
  btSide_l:'شمال',btSide_r:'يمين',btSide_t:'فوق',btSide_b:'تحت',addNote:'ورقة لاصقة',addDeco:'دبابيس',notePh:'دوس مرتين واكتب',
- pickPhoto:'عايز تحط أنهي صورة؟',photo:'صورة',deco_pinRed:'دبوس أحمر',deco_pinBlue:'دبوس أزرق',deco_pinGold:'دبوس دهبي',deco_tape:'شريط لاصق',deco_tapePink:'شريط لاصق بمبي',deco_clip:'مشبك ورق'});
+ pickPhoto:'عايز تحط أنهي صورة؟',photo:'صورة',addPen:'قلم',penDrawing:'بترسم',pen_pen:'قلم',pen_marker:'ماركر',pen_brush:'فرشاة',pen_highlight:'هايلايتر',penClear:'امسح الكل',deco_pinRed:'دبوس أحمر',deco_pinBlue:'دبوس أزرق',deco_pinGold:'دبوس دهبي',deco_tape:'شريط لاصق',deco_tapePink:'شريط لاصق بمبي',deco_clip:'مشبك ورق'});
