@@ -142,6 +142,7 @@ function resultCard(r,i){const worn=r.view==='worn'&&r.wornHTML;
  <p class="muted sm sr-items">${r.items.map(x=>esc(x.name||catName(x.category))).join(' · ')}</p>
  <div class="sr-acts">${r.saved?`<button class="btn sm" data-act="open">${t('openOutfit')}</button>`:`<button class="btn sm" data-act="save">♥ ${t('saveOutfit')}</button>`}
  <button class="btn ghost sm" data-act="plan">${ic('chevR',13,'rtl-flip')} ${st.sty.date?t('planOn',{d:dayLabel(st.sty.date)}):t('planIt')}</button>
+ <button class="btn ghost sm" data-act="advise">💬 ${t('advBtn')}</button>
  <span class="sp"></span><button class="btn ghost sm" data-act="reject" title="${t('notForMe')}">👎</button></div></div></div>`}
 
 function renderStylist(){const o=st.sty,A=o.anchor&&itemById(o.anchor);if(o.anchor&&!A)o.anchor=null;
@@ -177,6 +178,10 @@ async function onResultClick(e){const card=e.target.closest('.sres');if(!card)re
  const act=e.target.closest('[data-act]')?.dataset.act;if(!act)return;
  if(act==='save'){await saveResult(r);toast(t('outfitSaved'));card.outerHTML=resultCard(r,+card.dataset.i)}
  else if(act==='open'){st.view='outfits';openEditor(r.saved)}
+ else if(act==='advise'){const i=+card.dataset.i;openAdvisor(r.items,async a=>{
+   r.items=a.t==='add'?[...r.items,a.to]:a.t==='rm'?r.items.filter(x=>x!==a.from):r.items.map(x=>x===a.from?a.to:x);
+   const ctx=buildContext();Object.assign(r,scoreOutfit(r.items,ctx));r.reasons=explain(r.items,r,ctx);r.saved=null;r.wornHTML=null;r.view='flat';
+   const el=$(`#styOut .sres[data-i="${i}"]`);if(el)el.outerHTML=resultCard(r,i);return r.items},{weather:st.sty.weather})}
  else if(act==='plan'){let d=st.sty.date;if(!d){d=await askDate();if(!d)return}
   if(!r.saved)await saveResult(r);const p=planAt(d,true);p.outfit=r.saved;await saveMeta();toast(t('plannedFor',{d:dayLabel(d)}));card.outerHTML=resultCard(r,+card.dataset.i)}
  else if(act==='reject'){const P=PREFS();P.rejected=[...new Set([...P.rejected,sig(r.items)])].slice(-300);

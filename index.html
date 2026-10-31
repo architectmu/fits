@@ -440,7 +440,8 @@ async function loadAll(){
    if(c!==it.category){it.category=c;await DB.put('items',it)}}
   st.settings.subcats=4;await saveMeta()}
 }
-const itemById=id=>st.items.find(i=>i.id===id);
+// archived pieces are out of the closet but still show in old outfits and boards
+const itemById=id=>st.items.find(i=>i.id===id)||st.archived?.find(i=>i.id===id);
 /* categories form a two-level tree: a sub-category carries `parent` (e.g. ties → accessories) */
 function allCats(){const flat=[...CATS.map(c=>({id:c[0],name:L(c),parent:c[3]||''})),...st.settings.customCats.map(c=>({parent:'',...c}))],out=[];
  flat.filter(c=>!c.parent).forEach(p=>{out.push(p);flat.filter(c=>c.parent===p.id).forEach(ch=>out.push(ch))});return out}
@@ -1144,6 +1145,9 @@ async function boot(){
 <script src="stylist.js"></script>
 <script src="measure.js"></script>
 <script src="measure-guide.js"></script>
+<script src="archive.js"></script>
+<script src="collections.js"></script>
+<script src="advisor.js"></script>
 <script src="sizecharts.js"></script>
 <script src="backup-all.js"></script>
 <script src="board-tools.js"></script>

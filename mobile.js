@@ -23,7 +23,7 @@ function renderTabs(){let bar=$('#mTabs');if(!bar){bar=document.createElement('n
  document.body.classList.toggle('in-editor',st.view==='editor');
  bar.innerHTML=M_TABS.map(([v,icn])=>`<button data-v="${v}" class="${cur===v?'on':''}">${ic(icn,22)}<span>${t(v)}</span></button>`).join('')+
   `<button data-v="more" class="${inMore?'on':''}">${ic('mtMore',22)}<span>${t('mMore')}</span></button>`}
-function openMore(){const rest=NAV.filter(v=>!M_TABS.some(x=>x[0]===v));
+function openMore(){const rest=[...NAV.filter(v=>!M_TABS.some(x=>x[0]===v)),...(window.MORE_EXTRA||[])];
  const md=modal(`<h2>${t('mMore')}</h2><div class="m-more">${rest.map(v=>`<button data-v="${v}" class="${st.view===v?'on':''}"><span>${t(v)}</span>${ic('chevR',16,'rtl-flip')}</button>`).join('')}
   <button data-x="lang"><span>${lang==='ar'?'English':'عربي'}</span>${ic('chevR',16,'rtl-flip')}</button><button data-x="set"><span>${t('settings')}</span>${ic('chevR',16,'rtl-flip')}</button></div>`);
  md.onclick=e=>{const b=e.target.closest('[data-v],[data-x]');if(!b)return;closeModal();
@@ -32,7 +32,7 @@ const _renderNav=renderNav;
 renderNav=function(){_renderNav();renderTabs()};
 // closet toolbar on a phone: search on top, the rest in one swipeable row, "Add" as a floating button
 HOOKS.loaded.push(where=>{if(where!=='closet'||!isPhone())return;const tool=$('.ctool');if(!tool||$('.m-row',tool))return;
- const row=document.createElement('div');row.className='m-row';['#mSide','#sort','#bulkBtn','#dupBtn','#impBtn'].forEach(s=>{const n=$(s,tool);if(n)row.appendChild(n)});tool.appendChild(row)});
+ const row=document.createElement('div');row.className='m-row';['#mSide','#sort','#bulkBtn','#impBtn'].forEach(s=>{const n=$(s,tool);if(n)row.appendChild(n)});tool.appendChild(row)});
 
 document.head.insertAdjacentHTML('beforeend',`<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Fits">
@@ -103,6 +103,7 @@ document.head.insertAdjacentHTML('beforeend',`<meta name="apple-mobile-web-app-c
  .ctool{display:flex;flex-direction:column;align-items:stretch;gap:10px}
  .ctool{min-width:0;max-width:100%;flex-wrap:nowrap}.ctool>*{min-width:0}.ctool .search{flex:none;background:var(--card);border:1px solid var(--line)}
  .cmain{overflow-x:hidden}
+ #dupBtn{display:none}
  .m-row{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px 2px}.m-row::-webkit-scrollbar{display:none}
  .m-row>*{flex:none}.m-row .btn,.m-row .sel{padding:7px 13px;font-size:12.5px;font-weight:500;border-color:var(--line);background:var(--bg);color:var(--ink2);border-radius:999px}
  #addBtn{position:fixed;inset-inline-end:18px;bottom:calc(86px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:50%;padding:0;justify-content:center;font-size:0;gap:0;z-index:50;
