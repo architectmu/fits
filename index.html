@@ -77,10 +77,11 @@ main#view{flex:1;min-height:0;display:flex}
 .csec h3 span{color:var(--muted);font-weight:500;font-size:13px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px}
 .card{cursor:pointer;position:relative}
-.card-img{aspect-ratio:4/5;background:var(--card);border-radius:var(--r);position:relative;overflow:hidden;transition:transform .15s,box-shadow .15s}
+/* pieces float on the page: no box behind them, just a soft lift on hover */
+.card-img{aspect-ratio:4/5;background:none;position:relative;transition:transform .15s}
 /* absolutely placed so tall photos are fitted inside the 4:5 box instead of overflowing it and getting clipped */
-.card-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:14px}
-.card:hover .card-img{transform:translateY(-2px);box-shadow:var(--shadow)}
+.card-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:10px;transition:filter .15s}
+.card:hover .card-img{transform:translateY(-3px)}.card:hover .card-img img{filter:drop-shadow(0 10px 14px rgba(0,0,0,.18))}
 .card-img{position:relative}
 .card-img .alt{position:absolute;inset:0;opacity:0;transition:opacity .2s}
 .card:hover .card-img.has-alt .alt{opacity:1}
@@ -132,8 +133,9 @@ body.dragging .drop-ov{display:grid}
 .ed-l .search{max-width:none;flex:none}
 .ed-l .sel{border-radius:10px}
 .ed-items{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-content:start}
-.ei{aspect-ratio:4/5;background:var(--card);border-radius:10px;display:grid;place-items:center;cursor:grab;overflow:hidden;position:relative}
-.ei img{width:100%;height:100%;object-fit:contain;padding:6px;pointer-events:none}
+.ei{aspect-ratio:4/5;background:none;border-radius:10px;display:grid;place-items:center;cursor:grab;overflow:hidden;position:relative}
+.ei{aspect-ratio:auto;height:0;padding-bottom:125%}/* fixed 4:5 cells: aspect-ratio alone collapses the rows in this scrolling grid */
+.ei img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:6px;pointer-events:none}
 .ei:hover{outline:2px solid var(--ink)}
 .ei.used::after{content:'';position:absolute;top:6px;inset-inline-end:6px;width:7px;height:7px;border-radius:50%;background:var(--sel)}
 .ed-add{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
@@ -216,7 +218,7 @@ body.dragging .drop-ov{display:grid}
 .pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;max-height:56vh;overflow:auto}
 .pick{border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:6px;text-align:start;display:flex;flex-direction:column;gap:6px}
 .pick:hover,.pick.on{border-color:var(--ink)}
-.pick img,.pick .ph{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:var(--card)}
+.pick img,.pick .ph{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:none}
 .pick span{font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .seg{display:inline-flex;background:var(--card);border-radius:999px;padding:3px}
 .seg button{border:0;background:none;padding:6px 14px;border-radius:999px;font-size:13px}
@@ -1149,6 +1151,7 @@ async function boot(){
 <script src="collections.js"></script>
 <script src="advisor.js"></script>
 <script src="websearch.js"></script>
+<script src="mannequin.js"></script>
 <script src="sizecharts.js"></script>
 <script src="backup-all.js"></script>
 <script src="board-tools.js"></script>
